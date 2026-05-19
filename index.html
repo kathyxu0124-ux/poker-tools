@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#0a3d24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>德州扑克胜率计算器</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+       background:#0a3d24;background:linear-gradient(135deg,#0a3d24,#1a6b3d);
+       color:#eee;min-height:100vh;padding:16px;
+       padding-top:max(16px,env(safe-area-inset-top));
+       padding-bottom:max(16px,env(safe-area-inset-bottom));
+       padding-left:max(16px,env(safe-area-inset-left));
+       padding-right:max(16px,env(safe-area-inset-right))}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px;color:#fff}
+  .sub{font-size:13px;color:#cfd8d3;margin-bottom:14px}
+  .tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.15);
+        overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:10px 16px;cursor:pointer;border:none;background:transparent;
+       color:#cfd8d3;font-size:14px;font-family:inherit;border-bottom:2px solid transparent;
+       transition:all .15s;flex-shrink:0;white-space:nowrap}
+  .tab:hover{color:#fff}
+  .tab.active{color:#fbbf24;border-bottom-color:#fbbf24}
+  .view{display:none}
+  .view.active{display:block}
+  .panel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+         border-radius:10px;padding:14px;margin-bottom:12px;backdrop-filter:blur(6px)}
+  .label{font-size:11px;color:#9ca3a3;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .slots{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:center}
+  .slots .lbl{grid-column:1/-1;font-size:11px;color:#9ca3a3;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center}
+  .slots .lbl span{color:#fbbf24}
+  .slot{aspect-ratio:5/7;border:2px dashed rgba(255,255,255,.25);
+        border-radius:8px;display:flex;align-items:center;justify-content:center;
+        font-weight:700;background:rgba(0,0,0,.2);cursor:pointer;
+        transition:all .15s;color:#bbb;user-select:none;font-size:clamp(13px,3.5vw,18px);
+        position:relative;min-height:48px}
+  .slot::before{content:attr(data-tag);position:absolute;top:2px;left:4px;font-size:9px;color:#9ca3a3;font-weight:400}
+  .slot.filled{border-style:solid;background:#fff;color:#000;border-color:#fff}
+  .slot.filled::before{color:#999}
+  .slot.filled.red{color:#dc2626}
+  .slot.active{border-color:#fbbf24;box-shadow:0 0 0 3px rgba(251,191,36,.3)}
+  .deck{display:grid;grid-template-columns:repeat(13,1fr);gap:4px;margin-top:4px}
+  .card-btn{aspect-ratio:5/7;border:1px solid #555;border-radius:5px;background:#fff;
+            color:#000;font-weight:700;font-size:13px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;padding:0;
+            transition:all .1s;line-height:1;min-height:34px;touch-action:manipulation}
+  .card-btn.red{color:#dc2626}
+  .card-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,.3)}
+  .card-btn:active:not(:disabled){transform:scale(.95)}
+  .card-btn:disabled{opacity:.18;cursor:not-allowed;background:#444}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .controls label{display:block;font-size:11px;color:#9ca3a3;margin-bottom:4px;
+                  text-transform:uppercase;letter-spacing:.5px}
+  select,button{width:100%;padding:10px;border:1px solid rgba(255,255,255,.2);
+                border-radius:6px;background:rgba(0,0,0,.3);color:#fff;font-size:15px;
+                font-family:inherit;min-height:44px}
+  select{cursor:pointer;-webkit-appearance:none;appearance:none;
+         background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239ca3a3' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+         background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+  button.primary{background:#fbbf24;color:#000;font-weight:700;cursor:pointer;
+                 border-color:#fbbf24;font-size:16px;padding:13px}
+  button.primary:hover{background:#f59e0b}
+  button.primary:active{transform:scale(.98)}
+  button.primary:disabled{background:#666;border-color:#666;color:#999;cursor:wait}
+  button.secondary{background:transparent;cursor:pointer}
+  button.secondary:hover{background:rgba(255,255,255,.08)}
+  .results{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .result-box{background:rgba(0,0,0,.3);border-radius:8px;padding:12px 8px;text-align:center}
+  .result-box .v{font-size:clamp(22px,7vw,32px);font-weight:800;line-height:1}
+  .result-box .l{font-size:10px;color:#9ca3a3;margin-top:6px;text-transform:uppercase;letter-spacing:.5px}
+  .win .v{color:#22c55e}
+  .tie .v{color:#fbbf24}
+  .lose .v{color:#ef4444}
+  .equity-bar{margin-top:10px;height:8px;border-radius:4px;overflow:hidden;
+              display:flex;background:#222}
+  .equity-bar .w{background:#22c55e}
+  .equity-bar .t{background:#fbbf24}
+  .equity-bar .l{background:#ef4444}
+  .hint{font-size:12px;color:#9ca3a3;margin-top:8px;line-height:1.5}
+  .footer-info{display:flex;justify-content:space-between;align-items:center;gap:8px;
+               margin-top:10px;font-size:12px;color:#9ca3a3;flex-wrap:wrap}
+  .advice{margin-top:12px;padding:12px 14px;border-radius:8px;border-left:4px solid #fbbf24;
+          background:rgba(0,0,0,.3)}
+  .advice .head{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+  .advice .badge{padding:3px 10px;border-radius:4px;font-size:12px;font-weight:700}
+  .badge.b-raise{background:#dc2626;color:#fff}
+  .badge.b-bet{background:#ea580c;color:#fff}
+  .badge.b-call{background:#fbbf24;color:#000}
+  .badge.b-check{background:#6b7280;color:#fff}
+  .badge.b-fold{background:#374151;color:#9ca3af}
+  .advice .title{font-size:15px;font-weight:600}
+  .advice ul{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.7;color:#d4d4d4}
+  .advice ul li{margin-bottom:2px}
+  .doc{font-size:14px;line-height:1.75;color:#e5e5e5}
+  .doc h2{font-size:16px;margin:0 0 8px;color:#fbbf24}
+  .doc h3{font-size:14px;margin:14px 0 4px;color:#fff}
+  .doc-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px -4px}
+  .doc table{border-collapse:collapse;width:100%;font-size:13px;min-width:400px}
+  .doc th,.doc td{border:1px solid rgba(255,255,255,.15);padding:7px 10px;text-align:left}
+  .doc th{background:rgba(255,255,255,.06);font-weight:600;color:#fbbf24}
+  .doc code{background:rgba(0,0,0,.4);padding:1px 6px;border-radius:3px;font-size:12px;color:#fbbf24}
+  .seat-diagram{position:relative;width:100%;max-width:520px;aspect-ratio:1.5/1;margin:14px auto;
+                background:radial-gradient(ellipse at center,#1a6b3d 0%,#0a3d24 80%);
+                border:6px solid #5a3a1a;border-radius:50%/40%}
+  .seat{position:absolute;width:14%;aspect-ratio:1;border-radius:50%;
+        background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.2);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        color:#fff;transform:translate(-50%,-50%);min-width:42px}
+  .seat .n{font-weight:700;font-size:clamp(10px,2.5vw,13px);color:#fbbf24}
+  .seat.btn{border-color:#fbbf24;background:#fbbf24;color:#000}
+  .seat.btn .n{color:#000}
+  .legend-stage{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:6px}
+  .legend-stage .it{background:rgba(0,0,0,.25);padding:8px 10px;border-radius:6px;font-size:13px}
+  .legend-stage .it b{color:#fbbf24;display:block;margin-bottom:2px;font-size:12px}
+
+  /* Mobile-specific */
+  @media(max-width:600px){
+    body{padding:12px;
+         padding-top:max(12px,env(safe-area-inset-top));
+         padding-bottom:max(12px,env(safe-area-inset-bottom))}
+    h1{font-size:19px}
+    .sub{font-size:12px;margin-bottom:12px}
+    .panel{padding:12px;margin-bottom:10px;border-radius:8px}
+    .tab{padding:9px 12px;font-size:13px}
+    .deck{grid-template-columns:repeat(4,1fr);gap:6px}
+    .card-btn{font-size:18px;min-height:46px}
+    .controls{grid-template-columns:1fr;gap:10px}
+    .results{gap:6px}
+    .result-box{padding:10px 4px}
+    .doc{font-size:13px}
+    .doc h2{font-size:15px}
+  }
+  /* Tiny screens */
+  @media(max-width:360px){
+    .slot{font-size:12px;min-height:42px}
+    .slots{gap:4px}
+    .card-btn{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>德州扑克胜率计算器</h1>
+  <div class="sub">输入底牌、公共牌和位置，模拟胜率并给出行动建议。</div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="calc">胜率计算</button>
+    <button class="tab" data-view="rules">游戏规则</button>
+    <button class="tab" data-view="positions">位置详解</button>
+  </div>
+
+  <!-- ============ Calculator View ============ -->
+  <div class="view active" id="view-calc">
+    <div class="panel">
+      <div class="slots">
+        <div class="lbl">
+          <span style="color:#fbbf24">底牌 + 公共牌</span>
+          <button class="secondary" id="clearAll" style="width:auto;font-size:12px;padding:5px 10px;min-height:0">清空</button>
+        </div>
+        <div class="slot" data-slot="h0" data-tag="底1"></div>
+        <div class="slot" data-slot="h1" data-tag="底2"></div>
+        <div class="slot" data-slot="b0" data-tag="翻1"></div>
+        <div class="slot" data-slot="b1" data-tag="翻2"></div>
+        <div class="slot" data-slot="b2" data-tag="翻3"></div>
+        <div class="slot" data-slot="b3" data-tag="转"></div>
+        <div class="slot" data-slot="b4" data-tag="河"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="label">点击选牌（已被使用的会变灰）</div>
+      <div class="deck" id="deck"></div>
+    </div>
+
+    <div class="panel">
+      <div class="controls">
+        <div>
+          <label>你的位置</label>
+          <select id="position">
+            <option value="UTG">UTG · 枪口位</option>
+            <option value="UTG1">UTG+1</option>
+            <option value="MP">MP · 中位</option>
+            <option value="LJ">LJ · 劫机位</option>
+            <option value="HJ">HJ · 抢劫位</option>
+            <option value="CO">CO · 关煞位</option>
+            <option value="BTN" selected>BTN · 按钮位</option>
+            <option value="SB">SB · 小盲</option>
+            <option value="BB">BB · 大盲</option>
+          </select>
+        </div>
+        <div>
+          <label>对手数量</label>
+          <select id="oppCount">
+            <option value="1" selected>1 个</option>
+            <option value="2">2 个</option>
+            <option value="3">3 个</option>
+            <option value="4">4 个</option>
+            <option value="5">5 个</option>
+            <option value="8">8 个（满桌全跟）</option>
+          </select>
+        </div>
+        <div>
+          <label>对手范围</label>
+          <select id="oppRange">
+            <option value="auto" selected>自动（按位置推断）</option>
+            <option value="random">随机牌（任意 2 张）</option>
+            <option value="tight">紧 · 约 12%</option>
+            <option value="standard">标准 · 约 22%</option>
+            <option value="loose">松 · 约 40%</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="primary" id="calc">计算胜率</button>
+        </div>
+      </div>
+      <div class="hint" id="hint">提示：先选 2 张底牌后即可计算翻前胜率；再补公共牌可看翻后实时胜率。</div>
+    </div>
+
+    <div class="panel" id="resultPanel" style="display:none">
+      <div class="label">模拟结果</div>
+      <div class="results">
+        <div class="result-box win"><div class="v" id="winV">--</div><div class="l">胜率 Win</div></div>
+        <div class="result-box tie"><div class="v" id="tieV">--</div><div class="l">平局 Tie</div></div>
+        <div class="result-box lose"><div class="v" id="loseV">--</div><div class="l">败率 Lose</div></div>
+      </div>
+      <div class="equity-bar">
+        <div class="w" id="barW"></div><div class="t" id="barT"></div><div class="l" id="barL"></div>
+      </div>
+      <div class="footer-info">
+        <div id="equityInfo">权益（Equity）= 胜率 + 0.5 × 平局率</div>
+        <div id="meta"></div>
+      </div>
+      <div class="advice" id="advicePanel"></div>
+    </div>
+  </div>
+
+  <!-- ============ Rules View ============ -->
+  <div class="view" id="view-rules">
+    <div class="panel doc">
+      <h2>无限注德州扑克 · 规则速览</h2>
+
+      <h3>一、目标</h3>
+      用 2 张手牌（底牌）和 5 张公共牌中的任意组合，凑出 5 张最大牌型。最后留在牌桌上的人，或在摊牌阶段牌型最大的人，赢得底池。
+
+      <h3>二、牌局流程</h3>
+      每手牌按以下顺序进行：
+
+      <div class="doc-table-wrap">
+      <table>
+        <tr><th>阶段</th><th>说明</th></tr>
+        <tr><td>盲注 Blinds</td><td>按钮左侧第一位下小盲（SB），第二位下大盲（BB）。盲注是强制下注，无须等牌就要付。</td></tr>
+        <tr><td>翻前 Pre-flop</td><td>每人发 2 张底牌（朝下，只自己能看）。从 BB 左侧（UTG）开始顺时针行动：弃牌 / 跟注 / 加注。</td></tr>
+        <tr><td>翻牌 Flop</td><td>桌面同时翻开 3 张公共牌。从 SB 起顺时针行动：让牌 / 下注 / 跟注 / 加注 / 弃牌。</td></tr>
+        <tr><td>转牌 Turn</td><td>翻开第 4 张公共牌，再走一轮下注。</td></tr>
+        <tr><td>河牌 River</td><td>翻开第 5 张（最后一张）公共牌，最后一轮下注。</td></tr>
+        <tr><td>摊牌 Showdown</td><td>剩余玩家亮牌比大小，最大者赢底池。任何阶段只剩一人时直接赢得底池，无须摊牌。</td></tr>
+      </table>
+      </div>
+
+      <h3>三、行动选项</h3>
+      <ul>
+        <li><b>Fold 弃牌</b>：放弃这手牌和已下的筹码，退出本局。</li>
+        <li><b>Check 让牌</b>：本轮无人下注时，可以选择不下注、把决定权留给下一位。</li>
+        <li><b>Bet 下注</b>：本轮第一个下注的动作。最低下注一般等于一个大盲。</li>
+        <li><b>Call 跟注</b>：跟上当前最大下注额。</li>
+        <li><b>Raise 加注</b>：在已有下注上再加码。无限注规则下，最低加注额等于上一次加注的增量。</li>
+        <li><b>All-in 全下</b>：把全部筹码推入底池。剩余筹码不足跟注时，差额部分形成边池。</li>
+      </ul>
+
+      <h3>四、牌型大小（从大到小）</h3>
+      <div class="doc-table-wrap">
+      <table>
+        <tr><th>名次</th><th>牌型</th><th>说明</th><th>例子</th></tr>
+        <tr><td>1</td><td>皇家同花顺 Royal Flush</td><td>同花色 A-K-Q-J-T</td><td>A♠ K♠ Q♠ J♠ T♠</td></tr>
+        <tr><td>2</td><td>同花顺 Straight Flush</td><td>同花色的 5 张连牌</td><td>9♥ 8♥ 7♥ 6♥ 5♥</td></tr>
+        <tr><td>3</td><td>四条 Four of a Kind</td><td>4 张同点数 + 1 张踢脚</td><td>K♠ K♥ K♦ K♣ 2♠</td></tr>
+        <tr><td>4</td><td>葫芦 Full House</td><td>三条 + 一对</td><td>Q♠ Q♥ Q♦ 7♣ 7♠</td></tr>
+        <tr><td>5</td><td>同花 Flush</td><td>5 张同花色（不连）</td><td>A♣ J♣ 8♣ 5♣ 2♣</td></tr>
+        <tr><td>6</td><td>顺子 Straight</td><td>5 张连牌（不同花）</td><td>9♠ 8♥ 7♣ 6♦ 5♠</td></tr>
+        <tr><td>7</td><td>三条 Three of a Kind</td><td>3 张同点数 + 2 踢脚</td><td>8♠ 8♥ 8♦ A♣ K♠</td></tr>
+        <tr><td>8</td><td>两对 Two Pair</td><td>两组对子 + 1 踢脚</td><td>K♠ K♥ 4♣ 4♦ A♠</td></tr>
+        <tr><td>9</td><td>一对 One Pair</td><td>1 组对子 + 3 踢脚</td><td>A♠ A♥ K♦ 8♣ 3♠</td></tr>
+        <tr><td>10</td><td>高牌 High Card</td><td>什么都没凑成，比最大单张</td><td>A♠ J♥ 9♦ 6♣ 3♠</td></tr>
+      </table>
+      </div>
+
+      <h3>五、几个容易踩坑的细节</h3>
+      <ul>
+        <li>顺子里 A 既可当最大（A-K-Q-J-T）也可当最小（5-4-3-2-A，称 wheel），但不能 K-A-2-3-4 这样跨着用。</li>
+        <li>同花永远比顺子大；葫芦永远比同花大。</li>
+        <li>同牌型比大小看最大那张：两个同花，谁的最大同花张更大谁赢，依次比到第 5 张。</li>
+        <li>5 张牌必须固定。"用 4 张公共牌 + 1 张手牌" 或 "全用 5 张公共牌（play the board）" 都合法。</li>
+        <li>无限注（NLHE）任何时候都能 all-in；底池限注（PLHE）单次最高下注 = 当前底池金额。</li>
+        <li>按钮（Button / Dealer button）每手向左移一位，决定盲注和行动顺序。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ Positions View ============ -->
+  <div class="view" id="view-positions">
+    <div class="panel doc">
+      <h2>位置（Position）完整解释</h2>
+      位置就是你坐在按钮（庄家位）的相对座次。位置越靠后，行动顺序越晚，能看到的信息越多——这是德扑里仅次于牌力的关键变量。
+
+      <div class="seat-diagram" id="seatDiagram"></div>
+
+      <h3>9 人桌位置一览（按行动顺序）</h3>
+      <div class="doc-table-wrap">
+      <table>
+        <tr><th>缩写</th><th>全称</th><th>中文</th><th>翻前行动顺序</th><th>特点</th></tr>
+        <tr><td><code>SB</code></td><td>Small Blind</td><td>小盲</td><td>翻前倒数第二，翻后第 1</td><td>强制下半个 BB；翻后位置最差，永远在最先行动。</td></tr>
+        <tr><td><code>BB</code></td><td>Big Blind</td><td>大盲</td><td>翻前最后一个，翻后第 2</td><td>强制下 1 BB；面对 raise 时已投了钱，赔率好，防守要宽。</td></tr>
+        <tr><td><code>UTG</code></td><td>Under The Gun</td><td>枪口位</td><td>翻前第 1 个</td><td>"在枪口下"，最先行动信息最少，范围必须最紧。</td></tr>
+        <tr><td><code>UTG+1</code></td><td>UTG+1</td><td>枪口下一位</td><td>翻前第 2 个</td><td>仅次于 UTG 的早位，范围比 UTG 略宽。</td></tr>
+        <tr><td><code>MP</code></td><td>Middle Position</td><td>中位</td><td>翻前第 3 个</td><td>9-max 桌的中位偏前，可以加入中等强度的牌。</td></tr>
+        <tr><td><code>LJ</code></td><td>LoJack</td><td>劫机位</td><td>翻前第 4 个</td><td>HJ 的前一位，名字来自相对劫机位（HiJack）的"提前劫"。</td></tr>
+        <tr><td><code>HJ</code></td><td>HiJack</td><td>抢劫位 / 劫持位</td><td>翻前第 5 个</td><td>抢在 CO 之前先加注偷盲，故得名"抢劫"。开始进入后位区域。</td></tr>
+        <tr><td><code>CO</code></td><td>Cutoff</td><td>关煞位 / 切牌位</td><td>翻前第 6 个</td><td>历史上紧挨着切牌的座位。BTN 之外赢率最高的位置，常用来"切走"按钮的偷盲机会。</td></tr>
+        <tr><td><code>BTN</code></td><td>Button / Dealer</td><td>按钮位 / 庄家位</td><td>翻前倒数第三，翻后最后</td><td>翻后永远最后行动。德扑利润最高的位置，开池范围可达 45%+。</td></tr>
+      </table>
+      </div>
+
+      <h3>位置分组</h3>
+      <div class="legend-stage">
+        <div class="it"><b>早位 EP (Early)</b>UTG, UTG+1<br>信息最少，只玩强牌</div>
+        <div class="it"><b>中位 MP (Middle)</b>MP, LJ<br>范围加宽，避开 Kx 杂牌</div>
+        <div class="it"><b>后位 LP (Late)</b>HJ, CO, BTN<br>主动加注偷盲，范围最宽</div>
+        <div class="it"><b>盲注 Blinds</b>SB, BB<br>翻后位置最差，被动防守</div>
+      </div>
+
+      <h3>为什么位置如此重要</h3>
+      <ul>
+        <li><b>信息优势</b>：后位看到所有人行动后再决定，等于免费信息。</li>
+        <li><b>底池控制</b>：在位（IP, In Position）能选择跟注让牌看免费牌，或下注做大底池。</li>
+        <li><b>诈唬效率</b>：在位的诈唬让对手在劣势位置上做困难决定，成功率更高。</li>
+        <li><b>价值最大化</b>：在位时可以用更小尺度多挤价值，不在位（OOP, Out of Position）时往往只能 check-call。</li>
+      </ul>
+
+      <h3>实战经验法则</h3>
+      <ul>
+        <li>同样的牌，UTG 弃 / BTN 加注 是常态。AJo 在 UTG 是垃圾，在 BTN 是好牌。</li>
+        <li>盲注位玩牌一定亏（强制下注），目标是"少输"，不是"必赢"。</li>
+        <li>面对 UTG 加注请收紧反加范围，面对 BTN 加注则可以放宽——位置改变了对手的范围。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+//============ Tabs ============
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('view-'+t.dataset.view).classList.add('active');
+  };
+});
+
+//============ Seat diagram for positions view ============
+(function(){
+  const seats = [
+    {n:'BTN', cls:'btn', a:90},
+    {n:'SB',  a:60},
+    {n:'BB',  a:30},
+    {n:'UTG', a:0},
+    {n:'UTG+1', a:-30},
+    {n:'MP',  a:-60},
+    {n:'LJ',  a:-90},
+    {n:'HJ',  a:-120},
+    {n:'CO',  a:-150}
+  ];
+  const wrap = document.getElementById('seatDiagram');
+  const cx=50, cy=50, rx=46, ry=42;
+  seats.forEach(s=>{
+    const rad = s.a*Math.PI/180;
+    const x = cx + rx*Math.cos(rad);
+    const y = cy - ry*Math.sin(rad);
+    const el = document.createElement('div');
+    el.className = 'seat'+(s.cls?' '+s.cls:'');
+    el.style.left = x+'%';
+    el.style.top = y+'%';
+    el.innerHTML = `<div class="n">${s.n}</div>`;
+    wrap.appendChild(el);
+  });
+})();
+
+//============ Card model ============
+const RANKS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUITS = ['♣','♦','♥','♠'];
+const RED = new Set([1,2]);
+function cardId(rank,suit){ return rank*4+suit; }
+function cardRank(id){ return Math.floor(id/4); }
+function cardSuit(id){ return id%4; }
+function cardLabel(id){ return RANKS[cardRank(id)] + SUITS[cardSuit(id)]; }
+function isRed(id){ return RED.has(cardSuit(id)); }
+
+const slots = { h0:null, h1:null, b0:null, b1:null, b2:null, b3:null, b4:null };
+let activeSlot = 'h0';
+
+function renderSlots(){
+  document.querySelectorAll('.slot').forEach(el=>{
+    const k = el.dataset.slot, v = slots[k];
+    el.classList.remove('filled','red','active');
+    if (k===activeSlot) el.classList.add('active');
+    if (v!=null){
+      el.classList.add('filled');
+      if (isRed(v)) el.classList.add('red');
+      el.textContent = cardLabel(v);
+    } else el.textContent = '';
+  });
+}
+document.querySelectorAll('.slot').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const k = el.dataset.slot;
+    if (slots[k]!=null){ slots[k]=null; activeSlot=k; }
+    else activeSlot = k;
+    renderSlots(); renderDeck();
+  });
+});
+
+const deckEl = document.getElementById('deck');
+function buildDeck(){
+  deckEl.innerHTML = '';
+  const isMobile = window.innerWidth <= 600;
+  if (isMobile){
+    // rank-major: each row = one rank with its 4 suits across (♣♦♥♠)
+    for (let r=12;r>=0;r--){
+      for (let s=0;s<4;s++){
+        addCardBtn(cardId(r,s));
+      }
+    }
+  } else {
+    // suit-major: each row = one suit (♠ on top), ranks A→2 across
+    for (const s of [3,2,1,0]){
+      for (let r=12;r>=0;r--){
+        addCardBtn(cardId(r,s));
+      }
+    }
+  }
+}
+function addCardBtn(id){
+  const b = document.createElement('button');
+  b.className = 'card-btn'+(isRed(id)?' red':'');
+  b.dataset.id = id;
+  b.textContent = RANKS[cardRank(id)]+SUITS[cardSuit(id)];
+  b.onclick = ()=>pickCard(id);
+  deckEl.appendChild(b);
+}
+function renderDeck(){
+  const used = new Set(Object.values(slots).filter(v=>v!=null));
+  deckEl.querySelectorAll('button').forEach(b=>{ b.disabled = used.has(+b.dataset.id); });
+}
+let _resizeTimer;
+window.addEventListener('resize',()=>{
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(()=>{
+    const wasMobile = deckEl.firstChild && parseInt(getComputedStyle(deckEl).gridTemplateColumns.split(' ').length)<=4;
+    buildDeck(); renderDeck();
+  },150);
+});
+function nextEmpty(){
+  for (const k of ['h0','h1','b0','b1','b2','b3','b4']) if (slots[k]==null) return k;
+  return null;
+}
+function pickCard(id){
+  if (slots[activeSlot]==null){
+    slots[activeSlot] = id;
+    activeSlot = nextEmpty() || activeSlot;
+  } else {
+    const nx = nextEmpty();
+    if (nx){ slots[nx]=id; activeSlot = nextEmpty() || nx; }
+  }
+  renderSlots(); renderDeck();
+}
+document.getElementById('clearAll').onclick = ()=>{
+  for (const k in slots) slots[k]=null;
+  activeSlot='h0'; renderSlots(); renderDeck();
+  document.getElementById('resultPanel').style.display='none';
+};
+buildDeck(); renderSlots(); renderDeck();
+
+//============ Hand evaluator ============
+function evaluate7(cardIds){
+  const rankCount = new Array(13).fill(0);
+  const suitCount = new Array(4).fill(0);
+  const rankBySuit = [[],[],[],[]];
+  for (const id of cardIds){
+    const r=cardRank(id), s=cardSuit(id);
+    rankCount[r]++; suitCount[s]++; rankBySuit[s].push(r);
+  }
+  function findStraight(rs){
+    const set = new Set(rs);
+    if (set.has(12)) set.add(-1);
+    const arr = [...set].sort((a,b)=>b-a);
+    for (let i=0;i<=arr.length-5;i++) if (arr[i]-arr[i+4]===4) return arr[i];
+    return null;
+  }
+  let flushSuit=-1;
+  for (let s=0;s<4;s++) if (suitCount[s]>=5) flushSuit=s;
+  if (flushSuit>=0){
+    const sf = findStraight(rankBySuit[flushSuit]);
+    if (sf!=null) return 8e9 + (sf+1);
+  }
+  let four=-1; const threes=[], pairs=[];
+  for (let r=12;r>=0;r--){
+    if (rankCount[r]===4) four=r;
+    else if (rankCount[r]===3) threes.push(r);
+    else if (rankCount[r]===2) pairs.push(r);
+  }
+  if (four>=0){
+    let k=-1;
+    for (let r=12;r>=0;r--) if (r!==four && rankCount[r]>0){k=r;break;}
+    return 7e9 + four*100 + k;
+  }
+  if (threes.length>=1 && (threes.length>=2 || pairs.length>=1)){
+    const trip = threes[0];
+    const pair = threes.length>=2 ? threes[1] : pairs[0];
+    return 6e9 + trip*100 + pair;
+  }
+  if (flushSuit>=0){
+    const top5 = rankBySuit[flushSuit].sort((a,b)=>b-a).slice(0,5);
+    let v=0; for (const r of top5) v=v*15+r;
+    return 5e9 + v;
+  }
+  const allR=[]; for (let r=12;r>=0;r--) if (rankCount[r]>0) allR.push(r);
+  const st = findStraight(allR);
+  if (st!=null) return 4e9 + (st+1);
+  if (threes.length>=1){
+    const trip = threes[0]; const ks=[];
+    for (let r=12;r>=0 && ks.length<2;r--) if (r!==trip && rankCount[r]>0) ks.push(r);
+    return 3e9 + trip*1e4 + ks[0]*100 + ks[1];
+  }
+  if (pairs.length>=2){
+    const [p1,p2]=pairs; let k=-1;
+    for (let r=12;r>=0;r--) if (r!==p1 && r!==p2 && rankCount[r]>0){k=r;break;}
+    return 2e9 + p1*1e4 + p2*100 + k;
+  }
+  if (pairs.length===1){
+    const p=pairs[0]; const ks=[];
+    for (let r=12;r>=0 && ks.length<3;r--) if (r!==p && rankCount[r]>0) ks.push(r);
+    return 1e9 + p*1e6 + ks[0]*1e4 + ks[1]*100 + ks[2];
+  }
+  const top5 = allR.slice(0,5);
+  let v=0; for (const r of top5) v=v*15+r;
+  return v;
+}
+
+//============ Ranges ============
+const RANGE_TIGHT = ['22','33','44','55','66','77','88','99','TT','JJ','QQ','KK','AA',
+  'AKs','AQs','AJs','ATs','KQs','KJs','QJs','JTs','AKo','AQo','AJo','KQo'];
+const RANGE_STANDARD = RANGE_TIGHT.concat(['A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s',
+  'KTs','K9s','QTs','Q9s','J9s','T9s','98s','87s','76s','65s','ATo','KJo','QJo','JTo']);
+const RANGE_LOOSE = RANGE_STANDARD.concat(['K8s','K7s','K6s','K5s','Q8s','Q7s','J8s','T8s',
+  '97s','86s','75s','54s','A9o','A8o','A7o','A6o','A5o','KTo','K9o','QTo','Q9o','J9o','T9o','98o','87o']);
+
+function rankIdxFromChar(c){ return RANKS.indexOf(c); }
+function expandRange(arr){
+  const combos=[];
+  for (const h of arr){
+    const r1=rankIdxFromChar(h[0]), r2=rankIdxFromChar(h[1]);
+    if (h.length===2) for (let s1=0;s1<4;s1++) for (let s2=s1+1;s2<4;s2++) combos.push([cardId(r1,s1),cardId(r1,s2)]);
+    else if (h[2]==='s') for (let s=0;s<4;s++) combos.push([cardId(r1,s),cardId(r2,s)]);
+    else for (let s1=0;s1<4;s1++) for (let s2=0;s2<4;s2++) if (s1!==s2) combos.push([cardId(r1,s1),cardId(r2,s2)]);
+  }
+  return combos;
+}
+const COMBOS_TIGHT = expandRange(RANGE_TIGHT);
+const COMBOS_STANDARD = expandRange(RANGE_STANDARD);
+const COMBOS_LOOSE = expandRange(RANGE_LOOSE);
+
+function autoRangeForPosition(pos){
+  if (['UTG','UTG1','MP','LJ'].includes(pos)) return 'tight';
+  if (['HJ','CO'].includes(pos)) return 'standard';
+  return 'loose';
+}
+
+//============ Monte Carlo ============
+function simulate(hole, board, oppCount, rangeKey, trials){
+  const known = new Set([...hole, ...board]);
+  let combos=null;
+  if (rangeKey==='tight') combos=COMBOS_TIGHT;
+  else if (rangeKey==='standard') combos=COMBOS_STANDARD;
+  else if (rangeKey==='loose') combos=COMBOS_LOOSE;
+
+  let win=0,tie=0,lose=0;
+  for (let t=0;t<trials;t++){
+    const used = new Set(known);
+    const opps=[]; let ok=true;
+    for (let o=0;o<oppCount;o++){
+      let pair=null;
+      if (combos){
+        for (let i=0;i<60;i++){
+          const p = combos[Math.floor(Math.random()*combos.length)];
+          if (!used.has(p[0]) && !used.has(p[1])){ pair=[p[0],p[1]]; break; }
+        }
+        if (!pair){ ok=false; break; }
+      } else {
+        const deck=[]; for (let id=0;id<52;id++) if (!used.has(id)) deck.push(id);
+        const a = deck[Math.floor(Math.random()*deck.length)];
+        let b; do { b = deck[Math.floor(Math.random()*deck.length)]; } while (b===a);
+        pair=[a,b];
+      }
+      used.add(pair[0]); used.add(pair[1]); opps.push(pair);
+    }
+    if (!ok) continue;
+    const need = 5 - board.length;
+    const fullBoard = board.slice();
+    if (need>0){
+      const deck=[]; for (let id=0;id<52;id++) if (!used.has(id)) deck.push(id);
+      for (let i=0;i<need;i++){
+        const j = i + Math.floor(Math.random()*(deck.length-i));
+        [deck[i],deck[j]] = [deck[j],deck[i]];
+        fullBoard.push(deck[i]); used.add(deck[i]);
+      }
+    }
+    const my = evaluate7([...hole,...fullBoard]);
+    let bo=-1;
+    for (const op of opps){
+      const s = evaluate7([...op,...fullBoard]);
+      if (s>bo) bo=s;
+    }
+    if (my>bo) win++; else if (my===bo) tie++; else lose++;
+  }
+  const total = win+tie+lose||1;
+  return { win:win/total, tie:tie/total, lose:lose/total, trials:total };
+}
+
+//============ Action advice ============
+function makeAdvice(eq, stage, pos, oppCount, rangeKey){
+  const inPos = ['BTN','CO','HJ'].includes(pos);
+  const isPreflop = stage==='翻前';
+  const isRiver = stage==='河牌';
+  let badge='', title='', notes=[];
+
+  if (isPreflop){
+    if (eq>=0.65){
+      badge='b-raise'; title='加注（Raise）/ 3-bet';
+      notes.push('权益压倒对手范围，主动建立底池价值。');
+      notes.push('遇到 4-bet：AA/KK/AKs 继续推 5-bet 或全下；其它视深度而定。');
+    } else if (eq>=0.55){
+      badge='b-raise'; title='加注（Raise）';
+      notes.push(inPos ? '在位加注，可继续打三条街价值。' : '不在位也建议加注主动，但翻后控池。');
+      notes.push('遇到 3-bet：跟注为主，深筹码可考虑弃掉边缘牌。');
+    } else if (eq>=0.45){
+      badge=inPos?'b-bet':'b-call'; title=inPos?'加注（偷盲/价值兼有）':'跟注或弃牌';
+      notes.push(inPos ? '后位可以加注施压盲注，对手很可能弃牌。' : '前位强行加注 EV 偏低，跟注或直接弃。');
+    } else if (eq>=0.35){
+      badge='b-call'; title='跟注（隐含赔率）';
+      notes.push('小对子、同花连张靠隐含赔率：便宜看翻牌，打中三条/同花/顺子才赚大。');
+      notes.push('面对再加注（3-bet）大概率要弃，除非筹码深、对手范围松。');
+    } else {
+      badge='b-fold'; title='弃牌（Fold）';
+      notes.push('权益不足，强行入池长期亏损。');
+      notes.push(pos==='BB' ? '大盲已投盲，跟注门槛低；如果只需补 0.5 BB 看翻牌，可以放宽。' : '直接弃。');
+    }
+  } else {
+    // postflop heads-up assumption
+    if (oppCount===1){
+      if (eq>=0.70){
+        badge='b-raise'; title='大尺度价值下注（Big bet / Raise）';
+        notes.push('权益碾压，构建底池。建议 75%–100% 底池下注。');
+        notes.push(isRiver ? '河牌已确定牌力，敢于加注挤更多价值。' : '保护强牌，避免给到便宜的免费牌。');
+      } else if (eq>=0.55){
+        badge='b-bet'; title='中尺度价值下注（Value bet）';
+        notes.push('建议 50%–66% 底池下注。');
+        notes.push(inPos ? '在位可以三条街薄价值。' : '不在位时小心被加注，转牌可考虑控池。');
+      } else if (eq>=0.40){
+        badge='b-check'; title='控池（Check / Call）';
+        notes.push('权益不算明显领先，让对手主动下注或便宜进入下一条街。');
+        notes.push('面对正常下注（半池左右）：跟注；面对加注：考虑弃。');
+      } else if (eq>=0.25){
+        badge='b-call'; title='听牌权益，看赔率（Pot odds）';
+        notes.push('如果有同花/顺子等听牌，按底池赔率判断：底池 100、对手下注 50，需 25% 权益才划算跟注。');
+        notes.push(isRiver ? '河牌没有听牌权益了，这种胜率应当弃牌。' : '转牌可以跟一张，河牌不中就弃。');
+      } else {
+        badge='b-fold'; title='弃牌（Fold）/ 选择性诈唬';
+        notes.push('权益太低，跟注长期亏损。');
+        notes.push(inPos ? '在位且对手频繁让牌时，可以考虑半诈唬，但要有可信故事。' : '不在位直接弃牌。');
+      }
+    } else {
+      // multiway
+      const need = 0.5 + (oppCount-1)*0.05;
+      if (eq>=need+0.20){
+        badge='b-bet'; title='价值下注（多人池要重）';
+        notes.push(`${oppCount} 人池，建议 66%–100% 底池下注，把听牌赶走。`);
+      } else if (eq>=need){
+        badge='b-bet'; title='偏价值下注，但谨慎';
+        notes.push('多人池需要更高权益才下注。范围里有人击中你就吃大亏。');
+      } else if (eq>=need-0.15){
+        badge='b-check'; title='让牌跟注或弃（Check）';
+        notes.push('多人池让牌为主，避免被夹。');
+      } else {
+        badge='b-fold'; title='弃牌（Fold）';
+        notes.push('多人池权益不足，诈唬几乎不工作（总有人会跟）。');
+      }
+    }
+  }
+
+  // common postscript
+  if (!isPreflop && oppCount===1 && stage!=='河牌' && eq>=0.35 && eq<0.55){
+    notes.push('Tip: 跟注线 = 底池赔率 ≤ 你的权益。例如对手下半池你需 25% 权益。');
+  }
+  if (oppCount>=3 && eq<0.50){
+    notes.push('Tip: 多人池"权益要打折"，因为只要一人击中，你的赢率就大幅下降。');
+  }
+
+  return { badge, title, notes };
+}
+
+//============ Calc button ============
+document.getElementById('calc').onclick = async ()=>{
+  const hole = [slots.h0, slots.h1].filter(v=>v!=null);
+  if (hole.length<2){ alert('请先选择 2 张你的底牌'); return; }
+  const board = [slots.b0,slots.b1,slots.b2,slots.b3,slots.b4].filter(v=>v!=null);
+  if (board.length===1 || board.length===2){
+    alert('公共牌必须是 0 张（翻前）、3 张（翻牌）、4 张（转牌）或 5 张（河牌）');
+    return;
+  }
+  const pos = document.getElementById('position').value;
+  const oppCount = +document.getElementById('oppCount').value;
+  let rangeKey = document.getElementById('oppRange').value;
+  if (rangeKey==='auto') rangeKey = autoRangeForPosition(pos);
+
+  const btn = document.getElementById('calc');
+  btn.disabled=true; btn.textContent='计算中…';
+  document.getElementById('resultPanel').style.display='block';
+  await new Promise(r=>setTimeout(r,30));
+  const trials = board.length===5 ? 4000 : 10000;
+  const res = simulate(hole, board, oppCount, rangeKey, trials);
+  const fmt = x=>(x*100).toFixed(1)+'%';
+  document.getElementById('winV').textContent = fmt(res.win);
+  document.getElementById('tieV').textContent = fmt(res.tie);
+  document.getElementById('loseV').textContent = fmt(res.lose);
+  document.getElementById('barW').style.width = (res.win*100)+'%';
+  document.getElementById('barT').style.width = (res.tie*100)+'%';
+  document.getElementById('barL').style.width = (res.lose*100)+'%';
+  const eq = res.win + 0.5*res.tie;
+  document.getElementById('equityInfo').textContent =
+    `权益 Equity = ${fmt(eq)}  ·  对手范围: ${rangeKey}  ·  对手数: ${oppCount}`;
+  const stage = board.length===0?'翻前':board.length===3?'翻牌':board.length===4?'转牌':'河牌';
+  document.getElementById('meta').textContent = `${stage} · ${res.trials} 次模拟`;
+
+  const adv = makeAdvice(eq, stage, pos, oppCount, rangeKey);
+  document.getElementById('advicePanel').innerHTML = `
+    <div class="head">
+      <span class="badge ${adv.badge}">建议</span>
+      <span class="title">${adv.title}</span>
+    </div>
+    <ul>${adv.notes.map(n=>`<li>${n}</li>`).join('')}</ul>
+  `;
+
+  btn.disabled=false; btn.textContent='重新计算';
+};
+</script>
+</body>
+</html>

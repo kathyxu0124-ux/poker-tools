@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>9-Max 小额现金桌起手牌矩阵</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    background: #f5f5f4;
+    color: #222;
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 18px; }
+  .positions {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+  }
+  .pos-btn {
+    padding: 8px 14px; border: 1px solid #d6d3d1; background: #fff;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+    transition: all .15s;
+  }
+  .pos-btn:hover { background: #f5f5f4; }
+  .pos-btn.active {
+    background: #1f2937; color: #fff; border-color: #1f2937;
+  }
+  .grid-wrap { background: #fff; border: 1px solid #e7e5e4; border-radius: 8px; padding: 16px; }
+  table.grid {
+    border-collapse: collapse; margin: 0 auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+  table.grid td {
+    width: 46px; height: 36px; text-align: center;
+    border: 1px solid #fff;
+    font-weight: 600;
+    color: #1c1917;
+    user-select: none;
+  }
+  /* action colors */
+  .raise   { background: #c0392b; color: #fff; }       /* 加注 */
+  .raise-call { background: #e67e22; color: #fff; }    /* 加注/3-bet 跟 */
+  .call    { background: #f1c40f; color: #1c1917; }    /* 仅跟注/有限玩 */
+  .mixed   { background: #95a5a6; color: #fff; }       /* 混合策略 */
+  .fold    { background: #ecf0f1; color: #b0b0b0; }    /* 弃牌 */
+  /* diagonal pair tint */
+  .pair { box-shadow: inset 0 0 0 2px rgba(0,0,0,.15); }
+
+  .legend { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; }
+  .legend span.box {
+    display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+    vertical-align: middle; margin-right: 5px;
+  }
+  .notes { margin-top: 22px; background: #fff; border: 1px solid #e7e5e4;
+           border-radius: 8px; padding: 16px 20px; font-size: 14px; line-height: 1.7; }
+  .notes h3 { margin: 14px 0 6px; font-size: 15px; }
+  .notes h3:first-child { margin-top: 0; }
+  .notes code { background: #f5f5f4; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  .stat { display: inline-block; padding: 2px 8px; background: #1f2937; color: #fff;
+          border-radius: 4px; font-size: 12px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>9-Max 小额现金桌 · 起手牌范围矩阵</h1>
+  <div class="sub">RFI（Raise First In，前面无人入池时的首攻范围）。点击位置切换。</div>
+
+  <div class="positions" id="posBar"></div>
+
+  <div class="grid-wrap">
+    <table class="grid" id="grid"></table>
+    <div class="legend">
+      <div><span class="box raise"></span>加注 (Raise)</div>
+      <div><span class="box raise-call"></span>加注 / 跟 3-bet (Raise + Call vs 3-bet)</div>
+      <div><span class="box call"></span>跟注或混合 (Call / Mixed)</div>
+      <div><span class="box fold"></span>弃牌 (Fold)</div>
+      <div style="margin-left:auto;color:#666;">当前范围: <span id="freq" class="stat">--</span></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>小额现金桌（NL10 – NL50）调整原则</h3>
+    对手普遍偏松、不爱弃牌、诈唬频率低。所以：范围比 GTO 收紧约 10%–15%，重价值、轻诈唬；3-bet 多用线性范围（强牌再 3-bet），不用 polarized；翻后大牌打三条街价值，弱听牌不要乱半诈唬。
+
+    <h3>位置缩写</h3>
+    <code>UTG</code> 枪口位 ｜ <code>UTG+1</code> ｜ <code>MP</code> 中位 ｜ <code>LJ</code> 劫机位 ｜ <code>HJ</code> 抢劫位 ｜ <code>CO</code> 关煞位 ｜ <code>BTN</code> 按钮位 ｜ <code>SB</code> 小盲 ｜ <code>BB</code> 大盲
+
+    <h3>使用方法</h3>
+    场上前面所有人都弃牌时，按当前位置矩阵的颜色行动。如果前面已经有人加注，不要按这张表打——那是 3-bet/cold-call 范围，更窄。SB 永远不要 limp，要么加注要么弃牌。BB 是“防守跟注”范围，单独看最后一栏。
+
+    <h3>关键提醒</h3>
+    同花（s）始终比非同花（o）强一档，但同花本身只多 2%–4% 的胜率，主要价值在翻后可玩性。小对子（22–66）在多人池靠打中三条赚钱，前位不要 open；按钮位/CO 偷盲时可以加。AKo 单挑 65% 胜率但多人池跌到 18%，所以拿 AK 要 raise/3-bet 把池子打小。
+  </div>
+</div>
+
+<script>
+// 13 ranks, high to low
+const ranks = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+
+// Helper: build hand string for cell (row, col)
+// row >= col: pair (row==col) or offsuit (row>col? no — convention: above diagonal = suited)
+// Standard convention: row index < col index means suited (upper-right triangle)
+// We'll use: if r==c -> pair (e.g. AA), if r<c -> suited (e.g. AKs at row=A col=K), if r>c -> offsuit (AKo at row=K col=A)
+function handAt(r, c){
+  const hi = ranks[Math.min(r,c)];
+  const lo = ranks[Math.max(r,c)];
+  if (r===c) return hi+hi;
+  if (r<c) return hi+lo+'s';
+  return hi+lo+'o';
+}
+
+// Define ranges per position. Action codes: 'raise', 'raise-call', 'call', 'fold'
+// Small-stakes 9-max RFI ranges (tighter than GTO, value-oriented).
+// raise-call = top of range, will continue vs 3-bet; raise = open-raise but fold to most 3-bets;
+// call = limp/mixed (rare here, used for SB limp-or-some weak BB defends).
+
+const ranges = {
+  'UTG': {
+    desc: 'Under The Gun · 枪口位 · ~9%',
+    'raise-call': ['AA','KK','QQ','JJ','AKs','AKo'],
+    'raise':      ['TT','99','88','77','AQs','AQo','AJs','ATs','KQs','KJs','QJs','AJo']
+  },
+  'UTG+1': {
+    desc: 'UTG+1 · ~11%',
+    'raise-call': ['AA','KK','QQ','JJ','AKs','AKo','AQs'],
+    'raise':      ['TT','99','88','77','66','AQo','AJs','ATs','A9s','KQs','KJs','KTs','QJs','QTs','JTs','AJo','KQo']
+  },
+  'MP': {
+    desc: 'Middle Position · 中位 · ~13%',
+    'raise-call': ['AA','KK','QQ','JJ','TT','AKs','AKo','AQs','AQo'],
+    'raise':      ['99','88','77','66','55','AJs','ATs','A9s','A8s','A5s','KQs','KJs','KTs','K9s','QJs','QTs','Q9s','JTs','J9s','T9s','AJo','KQo','KJo']
+  },
+  'LJ': {
+    desc: 'LoJack · 劫机位 · ~16%',
+    'raise-call': ['AA','KK','QQ','JJ','TT','99','AKs','AKo','AQs','AQo','AJs'],
+    'raise':      ['88','77','66','55','44','ATs','A9s','A8s','A7s','A5s','A4s','KQs','KJs','KTs','K9s','K8s','QJs','QTs','Q9s','JTs','J9s','T9s','98s','87s','AJo','ATo','KQo','KJo','QJo']
+  },
+  'HJ': {
+    desc: 'HiJack · 抢劫位 · ~19%',
+    'raise-call': ['AA','KK','QQ','JJ','TT','99','AKs','AKo','AQs','AQo','AJs','AJo'],
+    'raise':      ['88','77','66','55','44','33','22','ATs','A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s','KQs','KJs','KTs','K9s','K8s','K7s','QJs','QTs','Q9s','Q8s','JTs','J9s','J8s','T9s','T8s','98s','97s','87s','76s','ATo','KQo','KJo','KTo','QJo','QTo','JTo']
+  },
+  'CO': {
+    desc: 'CutOff · 关煞位 · ~26%',
+    'raise-call': ['AA','KK','QQ','JJ','TT','99','88','AKs','AKo','AQs','AQo','AJs','AJo','KQs','KQo'],
+    'raise':      ['77','66','55','44','33','22','ATs','A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s','KJs','KTs','K9s','K8s','K7s','K6s','K5s','QJs','QTs','Q9s','Q8s','Q7s','JTs','J9s','J8s','J7s','T9s','T8s','T7s','98s','97s','87s','86s','76s','75s','65s','64s','54s','ATo','A9o','KJo','KTo','K9o','QJo','QTo','Q9o','JTo','J9o','T9o','98o']
+  },
+  'BTN': {
+    desc: 'Button · 按钮位 · ~46%',
+    'raise-call': ['AA','KK','QQ','JJ','TT','99','88','77','AKs','AKo','AQs','AQo','AJs','AJo','ATs','ATo','KQs','KQo','KJs'],
+    'raise':      ['66','55','44','33','22','A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s','A9o','A8o','A7o','A6o','A5o','A4o','A3o','A2o','KTs','K9s','K8s','K7s','K6s','K5s','K4s','K3s','K2s','KJo','KTo','K9o','K8o','K7o','QJs','QTs','Q9s','Q8s','Q7s','Q6s','Q5s','Q4s','QJo','QTo','Q9o','Q8o','JTs','J9s','J8s','J7s','J6s','JTo','J9o','J8o','T9s','T8s','T7s','T6s','T9o','T8o','98s','97s','96s','98o','87s','86s','85s','87o','76s','75s','74s','76o','65s','64s','54s','53s','43s']
+  },
+  'SB': {
+    desc: 'Small Blind · 小盲 · ~36% (raise or fold, never limp)',
+    'raise-call': ['AA','KK','QQ','JJ','TT','99','AKs','AKo','AQs','AQo','AJs','KQs'],
+    'raise':      ['88','77','66','55','44','33','22','AJo','ATs','ATo','A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s','A9o','A8o','A7o','KQo','KJs','KJo','KTs','KTo','K9s','K9o','K8s','K7s','K6s','K5s','QJs','QJo','QTs','QTo','Q9s','Q8s','Q7s','JTs','JTo','J9s','J8s','J7s','T9s','T8s','98s','97s','87s','76s','65s','54s']
+  },
+  'BB (vs BTN)': {
+    desc: 'Big Blind 防守 vs BTN open · ~50% (跟注为主)',
+    'raise-call': ['AA','KK','QQ','JJ','TT','AKs','AKo','AQs','AQo','AJs','KQs'],
+    'call':       ['99','88','77','66','55','44','33','22','AJo','ATs','ATo','A9s','A9o','A8s','A8o','A7s','A7o','A6s','A5s','A5o','A4s','A3s','A2s','KQo','KJs','KJo','KTs','KTo','K9s','K9o','K8s','K7s','K6s','K5s','K4s','QJs','QJo','QTs','QTo','Q9s','Q9o','Q8s','Q7s','Q6s','JTs','JTo','J9s','J9o','J8s','J7s','T9s','T9o','T8s','T7s','98s','98o','97s','87s','86s','76s','75s','65s','64s','54s','53s']
+  }
+};
+
+const order = ['UTG','UTG+1','MP','LJ','HJ','CO','BTN','SB','BB (vs BTN)'];
+
+const posBar = document.getElementById('posBar');
+order.forEach((p,i)=>{
+  const b = document.createElement('button');
+  b.className = 'pos-btn' + (i===0?' active':'');
+  b.textContent = p;
+  b.onclick = ()=>{
+    document.querySelectorAll('.pos-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    render(p);
+  };
+  posBar.appendChild(b);
+});
+
+function render(pos){
+  const g = document.getElementById('grid');
+  g.innerHTML = '';
+  const data = ranges[pos];
+  const set = (k)=> new Set(data[k]||[]);
+  const sRC = set('raise-call'), sR = set('raise'), sC = set('call');
+  let count = 0;
+  for (let r=0;r<13;r++){
+    const tr = document.createElement('tr');
+    for (let c=0;c<13;c++){
+      const h = handAt(r,c);
+      const td = document.createElement('td');
+      td.textContent = h;
+      let cls = 'fold';
+      if (sRC.has(h)) { cls='raise-call'; count++; }
+      else if (sR.has(h)) { cls='raise'; count++; }
+      else if (sC.has(h)) { cls='call'; count++; }
+      // 'raise-call' -> top of value (deep red); we treat 'raise-call' as the strongest raise tier
+      // remap so deep red = raise-call (value/3bet-call top), orange = raise only
+      if (cls === 'raise-call') cls = 'raise';            // strongest = deep red
+      else if (cls === 'raise') cls = 'raise-call';        // wider raises = orange
+      td.className = cls + (r===c ? ' pair' : '');
+      tr.appendChild(td);
+    }
+    g.appendChild(tr);
+  }
+  const total = 169;
+  // weight by combos: pairs=6, suited=4, offsuit=12, total combos = 1326
+  let combos = 0;
+  Object.values(data).forEach(arr=>{
+    if (!Array.isArray(arr)) return;
+    arr.forEach(h=>{
+      if (h.length===2) combos += 6;          // pair
+      else if (h.endsWith('s')) combos += 4;  // suited
+      else combos += 12;                       // offsuit
+    });
+  });
+  const pct = (combos/1326*100).toFixed(1);
+  document.getElementById('freq').textContent = `${pos} · ${pct}% (${count}/169 牌型) — ${data.desc}`;
+}
+
+render('UTG');
+</script>
+</body>
+</html>
